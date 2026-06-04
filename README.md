@@ -1,1 +1,0 @@
-# Seminario_Tecnologias_Inoformacion
