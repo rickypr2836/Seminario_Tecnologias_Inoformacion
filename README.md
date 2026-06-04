@@ -1,4 +1,4 @@
-# 🌊 Enjambre Abismal — T3: Mundo 3D Autónomo
+# Enjambre Abismal — T3: Mundo 3D Autónomo
 
 > Proyecto de gráficas 3D desarrollado con Three.js.  
 > Integración de los entregables T1, T2 y T3 mediante una arquitectura modular basada en ES Modules.
