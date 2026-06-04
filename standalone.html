@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>T3 · Enjambre Abismal</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{background:#010814;overflow:hidden;font-family:'Space Mono',monospace}
+canvas{display:block}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#hud-title{position:absolute;top:20px;left:22px}
+#hud-title h1{font-size:12px;font-weight:700;letter-spacing:.22em;color:#44ccff;text-transform:uppercase}
+#hud-title p{font-size:9px;letter-spacing:.12em;color:rgba(68,204,255,.35);margin-top:4px}
+#tags{position:absolute;top:64px;left:22px;display:flex;flex-direction:column;gap:4px}
+.tag{font-size:8px;letter-spacing:.12em;padding:3px 8px;text-transform:uppercase;border-radius:2px}
+.t1{background:rgba(68,204,255,.08);color:rgba(68,204,255,.6);border:1px solid rgba(68,204,255,.2)}
+.t2{background:rgba(136,68,255,.08);color:rgba(136,68,255,.6);border:1px solid rgba(136,68,255,.2)}
+.t3{background:rgba(68,255,136,.08);color:rgba(68,255,136,.6);border:1px solid rgba(68,255,136,.2)}
+#stats{position:absolute;top:20px;right:22px;text-align:right}
+.sr{display:flex;gap:10px;justify-content:flex-end;margin-bottom:5px}
+.sl{font-size:9px;letter-spacing:.14em;color:rgba(255,255,255,.25);text-transform:uppercase}
+.sv{font-size:9px;color:#44ccff;min-width:28px;text-align:right}
+#ctrl{position:absolute;bottom:22px;left:22px;pointer-events:all;display:flex;flex-direction:column;gap:10px}
+#srow{display:flex;align-items:center;gap:10px}
+#srow label{font-size:9px;letter-spacing:.12em;color:rgba(68,204,255,.45);text-transform:uppercase}
+#spd{-webkit-appearance:none;appearance:none;width:150px;height:2px;background:rgba(68,204,255,.2);outline:none;cursor:pointer}
+#spd::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#44ccff;cursor:pointer}
+#sval{font-size:10px;color:#44ccff;min-width:44px}
+#brow{display:flex;gap:8px}
+.btn{background:rgba(68,204,255,.06);border:1px solid rgba(68,204,255,.25);color:#44ccff;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;padding:6px 14px;cursor:pointer;transition:background .18s}
+.btn:hover{background:rgba(68,204,255,.2);border-color:#44ccff}
+.btn.on{background:rgba(68,204,255,.28);border-color:#44ccff}
+#leg{position:absolute;bottom:22px;right:22px}
+#leg p{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.18)}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="hud-title">
+    <h1>Enjambre Abismal</h1>
+    <p>T3 · Mundo 3D · Agentes Autónomos</p>
+  </div>
+  <div id="tags">
+    <span class="tag t1">T1 · World: cámara · luces · entorno</span>
+    <span class="tag t2">T2-C · Agent: jerarquía · Math.sin</span>
+    <span class="tag t3">T3 · Swarm: 10 instancias autónomas</span>
+  </div>
+  <div id="stats">
+    <div class="sr"><span class="sl">Agentes</span><span class="sv" id="n-agents">—</span></div>
+    <div class="sr"><span class="sl">FPS</span><span class="sv" id="n-fps">—</span></div>
+    <div class="sr"><span class="sl">Nodos</span><span class="sv" id="n-nodes">—</span></div>
+  </div>
+  <div id="ctrl">
+    <div id="srow">
+      <label>Velocidad</label>
+      <input type="range" id="spd" min="0" max="4" step="0.05" value="1">
+      <span id="sval">1.00×</span>
+    </div>
+    <div id="brow">
+      <button class="btn" id="btn-pause">⏸ Pausar</button>
+      <button class="btn" id="btn-home">⌂ Cámara</button>
+      <button class="btn" id="btn-spread">↔ Dispersar</button>
+    </div>
+  </div>
+  <div id="leg"><p>🖱 Drag · Scroll zoom · Derecho: pan</p></div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ══════════════════════════════════════════════════════
+   WORLD (T1) — Renderer, Cámara, Luces, Entorno
+══════════════════════════════════════════════════════ */
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x010c1a);
+scene.fog = new THREE.FogExp2(0x010c1a, 0.022);
+
+/* PerspectiveCamera — FOV / aspect / near / far */
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 300);
+camera.position.set(0, 6, 28);
+camera.lookAt(0, 0, 0);
+
+/* OrbitControls — controls.update() en el loop */
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 0, 0);
+controls.minDistance = 4;
+controls.maxDistance = 100;
+
+/* HemisphereLight (T1) */
+const hemi = new THREE.HemisphereLight(0x1a3a6a, 0x050f0a, 1.2);
+scene.add(hemi);
+
+/* DirectionalLight con sombras (T1) */
+const sun = new THREE.DirectionalLight(0x88ccff, 2.0);
+sun.position.set(8, 18, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 80;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -32;
+sun.shadow.camera.right = sun.shadow.camera.top   =  32;
+sun.shadow.bias = -0.001;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0x334488, 0.6);
+fill.position.set(-6, 4, -8);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(0x0a1a44, 0.5);
+rim.position.set(0, -4, -12);
+scene.add(rim);
+
+/* Entorno — suelo, cúpula, partículas, rocas */
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x081420, roughness: 0.95, metalness: 0.05 });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -14;
+floor.receiveShadow = true;
+scene.add(floor);
+
+scene.add(new THREE.Mesh(
+  new THREE.SphereGeometry(200, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0x010610, side: THREE.BackSide })
+));
+
+/* Partículas de bioluminiscencia */
+const PC = 1400;
+const pp = new Float32Array(PC * 3);
+const pc = new Float32Array(PC * 3);
+for (let i = 0; i < PC; i++) {
+  pp[i*3]   = (Math.random() - 0.5) * 80;
+  pp[i*3+1] = (Math.random() - 0.5) * 36;
+  pp[i*3+2] = (Math.random() - 0.5) * 80;
+  const m = Math.random();
+  pc[i*3]   = 0.04 + m * 0.08;
+  pc[i*3+1] = 0.18 + m * 0.30;
+  pc[i*3+2] = 0.40 + m * 0.50;
+}
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pp, 3));
+pGeo.setAttribute('color',    new THREE.BufferAttribute(pc, 3));
+const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({
+  size: 0.09, vertexColors: true, transparent: true, opacity: 0.55, sizeAttenuation: true
+}));
+scene.add(particles);
+
+/* Rocas decorativas */
+const rMat = new THREE.MeshStandardMaterial({ color: 0x0c1820, roughness: 0.95 });
+[[-10,-14,-6],[9,-14,-10],[-4,-14,8],[16,-14,4],[-15,-14,2],[0,-14,-13]].forEach(([x,y,z], i) => {
+  const s = 0.9 + Math.random() * 1.3;
+  const g = i % 2 === 0 ? new THREE.DodecahedronGeometry(s, 0) : new THREE.OctahedronGeometry(s, 0);
+  const m = new THREE.Mesh(g, rMat);
+  m.position.set(x, y + s * 0.5, z);
+  m.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+  m.castShadow = m.receiveShadow = true;
+  scene.add(m);
+});
+
+/* Resize handler (T1) */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+});
+
+/* ══════════════════════════════════════════════════════
+   AGENT CLASS (T2-C) — Criatura articulada autónoma
+   Jerarquía: root → bellGroup → 6 × (base → mid → tip)
+   Total nodos por agente: 1 + 1 + 6×3 = 20
+══════════════════════════════════════════════════════ */
+
+/* Geometrías compartidas entre todas las instancias */
+const GEO = {
+  bell: new THREE.SphereGeometry(1, 22, 22, 0, Math.PI * 2, 0, Math.PI * 0.52),
+  rim:  new THREE.TorusGeometry(1, 0.075, 10, 56),
+  tb:   new THREE.CylinderGeometry(0.052, 0.038, 0.85, 6),
+  tm:   new THREE.CylinderGeometry(0.038, 0.026, 0.95, 6),
+  tt:   new THREE.CylinderGeometry(0.026, 0.007, 1.05, 6),
+  nm:   new THREE.SphereGeometry(0.042, 6, 6),
+};
+
+/* Materiales base (clonados si hay tinte) */
+const MAT = {
+  bell: new THREE.MeshPhongMaterial({ color:0x66aacc, emissive:0x112233, shininess:90,  transparent:true, opacity:0.78, side:THREE.DoubleSide }),
+  rim:  new THREE.MeshPhongMaterial({ color:0x44ccff, emissive:0x002244, shininess:120, transparent:true, opacity:0.65 }),
+  tb:   new THREE.MeshPhongMaterial({ color:0x8844cc, emissive:0x220044, shininess:80,  transparent:true, opacity:0.72 }),
+  tm:   new THREE.MeshPhongMaterial({ color:0x44aaee, emissive:0x001122, shininess:100, transparent:true, opacity:0.60 }),
+  tt:   new THREE.MeshPhongMaterial({ color:0xaaddff, emissive:0x003344, shininess:140, transparent:true, opacity:0.45 }),
+};
+
+class Agent {
+  constructor({ position, rotation, speed = 1.5, scale = 1.0, color = null, phase = 0, bounds = { x:26, y:13, z:26 } }) {
+    this.speed  = speed;
+    this.bounds = bounds;
+    this._t     = phase;
+    this.turnY  = (Math.random() - 0.5) * 0.65;
+    this.turnX  = (Math.random() - 0.5) * 0.28;
+    this._fwd   = new THREE.Vector3();
+
+    /* Nodo raíz — posición y orientación iniciales */
+    this.root = new THREE.Group();
+    this.root.position.copy(position);
+    this.root.rotation.copy(rotation);
+    this.root.scale.setScalar(scale);
+
+    /* Campana */
+    this._bell = new THREE.Group();
+    this.root.add(this._bell);
+
+    const bMat = color ? MAT.bell.clone() : MAT.bell;
+    if (color) { bMat.color.set(color); bMat.emissive.set(color).multiplyScalar(0.12); }
+
+    const bellMesh = new THREE.Mesh(GEO.bell, bMat);
+    bellMesh.rotation.x = Math.PI;
+    this._bell.add(bellMesh);
+
+    const rimMesh = new THREE.Mesh(GEO.rim, MAT.rim);
+    rimMesh.position.y = -0.04;
+    this._bell.add(rimMesh);
+
+    /* Glow puntual interior */
+    this._glow = new THREE.PointLight(color || 0x44ccff, 0.6, 5);
+    this._bell.add(this._glow);
+
+    /* 6 Tentáculos — 3 nodos cada uno (T2-C) */
+    this._tents = [];
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const ph  = (i / 6) * Math.PI * 2;  /* desfase de animación por tentáculo */
+      const r   = 0.90;
+
+      const bg = new THREE.Group();
+      bg.position.set(Math.cos(ang) * r, -0.04, Math.sin(ang) * r);
+      bg.rotation.y = ang;
+      bg.rotation.z = 0.20;
+      this._bell.add(bg);
+      const bm = new THREE.Mesh(GEO.tb, MAT.tb); bm.position.y = -0.42; bg.add(bm);
+
+      const mg = new THREE.Group(); mg.position.y = -0.85; bg.add(mg);
+      const mm = new THREE.Mesh(GEO.tm, MAT.tm); mm.position.y = -0.48; mg.add(mm);
+
+      const tg = new THREE.Group(); tg.position.y = -0.95; mg.add(tg);
+      const tm2 = new THREE.Mesh(GEO.tt, MAT.tt); tm2.position.y = -0.52; tg.add(tm2);
+
+      const nmMat = new THREE.MeshPhongMaterial({
+        color: 0xffffff, emissive: color || 0x44ccff,
+        emissiveIntensity: 1.0, transparent: true, opacity: 0.88,
+      });
+      const ne = new THREE.Mesh(GEO.nm, nmMat); ne.position.y = -1.10; tg.add(ne);
+
+      this._tents.push({ bg, mg, tg, ph });
+    }
+  }
+
+  update(dt) {
+    this._t += dt;
+    const t = this._t;
+
+    /* Pulsación de la campana */
+    const p = 1 + Math.sin(t * 2.5) * 0.09;
+    this._bell.scale.set(1 + Math.sin(t * 2.5) * 0.03, p, 1 + Math.sin(t * 2.5) * 0.03);
+
+    /* Animación de tentáculos — amplitud y fase distintas por segmento y tentáculo */
+    this._tents.forEach(({ bg, mg, tg, ph }) => {
+      bg.rotation.x  = Math.sin(t * 1.8 + ph)          * 0.30;
+      bg.rotation.z += (Math.sin(t * 1.4 + ph + 1.0) * 0.18 - bg.rotation.z) * 0.12;
+      mg.rotation.x  = Math.sin(t * 2.2 + ph + 0.8)    * 0.50;
+      mg.rotation.z  = Math.cos(t * 1.8 + ph + 0.5)    * 0.26;
+      tg.rotation.x  = Math.sin(t * 2.8 + ph + 1.6)    * 0.70;
+      tg.rotation.z  = Math.cos(t * 2.4 + ph + 1.2)    * 0.38;
+    });
+
+    /* Parpadeo del glow */
+    this._glow.intensity = 0.45 + Math.sin(t * 2.5) * 0.28;
+
+    /* Giro autónomo tipo "wander" (varía con sin para evitar rectas) */
+    this.root.rotation.y += this.turnY * Math.sin(t * 0.28) * dt;
+    this.root.rotation.x  = Math.max(-0.55, Math.min(0.55,
+      this.root.rotation.x + this.turnX * Math.sin(t * 0.22 + 1.1) * dt
+    ));
+
+    /* Avance en la dirección local -Z del agente (T3) */
+    this._fwd
+      .set(0, 0, -1)
+      .applyQuaternion(this.root.quaternion)
+      .multiplyScalar(this.speed * dt);
+    this.root.position.add(this._fwd);
+
+    /* Wrap-around al cruzar los límites del mundo (T3) */
+    const pos = this.root.position;
+    const b   = this.bounds;
+    if (pos.x >  b.x) pos.x = -b.x;
+    if (pos.x < -b.x) pos.x =  b.x;
+    if (pos.y >  b.y) pos.y = -b.y;
+    if (pos.y < -b.y) pos.y =  b.y;
+    if (pos.z >  b.z) pos.z = -b.z;
+    if (pos.z < -b.z) pos.z =  b.z;
+  }
+
+  addTo(sc) { sc.add(this.root); return this; }
+}
+
+/* ══════════════════════════════════════════════════════
+   MAIN (T3) — Instanciar enjambre de 10 agentes
+══════════════════════════════════════════════════════ */
+
+const BOUNDS  = { x: 26, y: 13, z: 26 };
+const PALETTE = [
+  0x44ccff, 0x8844ff, 0xff4488, 0x44ff88, 0xffaa22,
+  0xff6644, 0x22aaff, 0xcc44ff, 0x44ffcc, 0xffff44,
+];
+
+/* Posición aleatoria dentro del volumen del mundo */
+const rPos = () => new THREE.Vector3(
+  (Math.random() - 0.5) * (BOUNDS.x * 1.6),
+  (Math.random() - 0.5) * (BOUNDS.y * 1.6),
+  (Math.random() - 0.5) * (BOUNDS.z * 1.6)
+);
+
+/* Orientación completamente aleatoria */
+const rRot = () => new THREE.Euler(
+  (Math.random() - 0.5) * Math.PI,
+  Math.random() * Math.PI * 2,
+  0
+);
+
+/* Crear 10 instancias del Agent — posición, orientación, escala y color distintos */
+const agents = [];
+for (let i = 0; i < 10; i++) {
+  const a = new Agent({
+    position: rPos(),
+    rotation: rRot(),
+    speed:    1.2 + Math.random() * 1.2,
+    scale:    0.55 + Math.random() * 0.55,
+    color:    new THREE.Color(PALETTE[i]),
+    phase:    (i / 10) * Math.PI * 2,
+    bounds:   BOUNDS,
+  });
+  a.addTo(scene);
+  agents.push(a);
+}
+
+/* Actualizar HUD */
+document.getElementById('n-agents').textContent = agents.length;
+document.getElementById('n-nodes').textContent  = agents.length * 20;
+
+/* ── Controles de UI ── */
+let globalSpeed = 1.0;
+let paused      = false;
+let _ff = 0, _fa = 0;
+
+document.getElementById('spd').addEventListener('input', e => {
+  globalSpeed = parseFloat(e.target.value);
+  document.getElementById('sval').textContent = globalSpeed.toFixed(2) + '×';
+});
+
+document.getElementById('btn-pause').addEventListener('click', e => {
+  paused = !paused;
+  e.target.textContent = paused ? '▶ Reanudar' : '⏸ Pausar';
+  e.target.classList.toggle('on', paused);
+});
+
+document.getElementById('btn-home').addEventListener('click', () => {
+  camera.position.set(0, 6, 28);
+  controls.target.set(0, 0, 0);
+  controls.update();
+});
+
+document.getElementById('btn-spread').addEventListener('click', () => {
+  agents.forEach(a => {
+    a.root.position.copy(rPos());
+    a.root.rotation.copy(rRot());
+  });
+});
+
+/* ══════════════════════════════════════════════════════
+   RENDER LOOP — requestAnimationFrame
+   controls.update() en cada frame (obligatorio con damping)
+══════════════════════════════════════════════════════ */
+const clock = new THREE.Clock();
+
+(function loop() {
+  requestAnimationFrame(loop);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t  = clock.getElapsedTime();
+
+  if (!paused) {
+    const sdt = dt * globalSpeed;
+    agents.forEach(a => a.update(sdt));
+  }
+
+  /* Animar entorno */
+  particles.rotation.y = t * 0.005;
+  hemi.intensity = 1.1 + Math.sin(t * 0.18) * 0.12;
+
+  /* FPS — actualizar cada 30 frames */
+  _ff++;
+  _fa += dt;
+  if (_ff >= 30) {
+    document.getElementById('n-fps').textContent = Math.round(_ff / _fa);
+    _ff = 0; _fa = 0;
+  }
+
+  controls.update();   /* OBLIGATORIO con enableDamping */
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

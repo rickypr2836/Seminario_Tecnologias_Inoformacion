@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swarm · T3 · Mundo 3D Autónomo</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══════════════ HUD ══════════════ -->
+<div id="hud">
+
+  <!-- Título -->
+  <div id="hud-title">
+    <h1>ENJAMBRE ABISMAL</h1>
+    <p>T3 · Mundo 3D con Agentes Autónomos</p>
+  </div>
+
+  <!-- Stats top-right -->
+  <div id="hud-stats">
+    <div class="stat-row">
+      <span class="stat-label">Agentes</span>
+      <span class="stat-val" id="hud-count">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">FPS</span>
+      <span class="stat-val" id="hud-fps">—</span>
+    </div>
+  </div>
+
+  <!-- Controles bottom -->
+  <div id="hud-controls">
+    <div id="speed-row">
+      <label for="speed-slider">Velocidad global</label>
+      <input type="range" id="speed-slider" min="0" max="4" step="0.05" value="1">
+      <span id="speed-val">1.00×</span>
+    </div>
+    <div id="btn-row">
+      <button class="ctrl-btn" id="btn-pause">⏸ Pausar</button>
+      <button class="ctrl-btn" id="btn-home">⌂ Cámara</button>
+    </div>
+  </div>
+
+  <!-- Leyenda -->
+  <div id="hud-legend">
+    <p>🖱 Arrastrar · Scroll zoom · Clic derecho pan</p>
+  </div>
+
+</div>
+
+<!-- ══════════════ THREE.JS ══════════════ -->
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
